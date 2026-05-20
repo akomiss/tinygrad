@@ -3,7 +3,7 @@ import math
 class Value:
     def __init__(self, data, parents=(), op='', label='unlabeled'):
         self.data = data
-        self.parents = set(parents)
+        self.parents = list(parents)
         self.op = op
         self.grad = 0
         self.label = label
