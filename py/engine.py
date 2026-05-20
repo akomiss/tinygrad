@@ -1,3 +1,5 @@
+import math
+
 class Value:
     def __init__(self, data, parents=(), op='', label='unlabeled'):
         self.data = data
@@ -17,6 +19,11 @@ class Value:
         child = Value(self.data * other.data, (self, other), op='*')
         return child
 
+    def tanh(self):
+        n = self.data
+        val = (math.exp(2*n) - 1)/(math.exp(2*n) + 1)
+        return Value(data=val, parents=(self, ), op='tanh', label='tanh()')
+
     def __div__(self, other):
         child = Value(self.data / other.data, (self, other), op='/')
         return child
@@ -27,6 +34,9 @@ class Value:
         print(order)
         for n in order:
             if len(n.parents) == 0:
+                continue
+            if n.op == 'tanh':
+                list(n.parents)[0].grad = 1 - n.data ** 2
                 continue
             p1,p2 = list(n.parents)[0], list(n.parents)[1]
             if n.op == '+':
