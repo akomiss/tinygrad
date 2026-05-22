@@ -1,74 +1,86 @@
 import math
 
 class Value:
-    def __init__(self, data, parents=(), op='', label='unlabeled'):
+    def __init__(self, data, parents=(), op='', label='unlabeled', _back=lambda: None):
         self.data = data
         self.parents = list(parents)
         self.op = op
         self.grad = 0
+        self._back = _back
         self.label = label
 
     def __repr__(self):
         return f'Value(data={self.data}, grad={self.grad}, label={self.label})'
 
+    def __neg__(self):
+        return -1 * self
+
     def __add__(self, other):
+        other = other if isinstance(other, Value) else Value(other)
         child = Value(self.data + other.data, (self, other), op='+')
+        def back():
+            self.grad += child.grad
+            other.grad += child.grad
+        child._back = back
         return child
 
     def __mul__(self, other):
+        other = other if isinstance(other, Value) else Value(other)
         child = Value(self.data * other.data, (self, other), op='*')
+        def back():
+            self.grad += other.data * child.grad
+            other.grad += self.data * child.grad
+        child._back = back
         return child
+
+    def __rmul__(self, other):
+        return self * other
+
+    def __radd__(self, other):
+        return self + other
+
+    def __rtruediv__(self, other):
+        return other * (self**-1)
 
     def __sub__(self, other):
-        child = Value(self.data - other.data, (self, other), op='-')
-        return child
+       return self + -other 
 
     def __pow__(self, power):
-        child = Value(self.data ** power.data, (self, other), op='**')
+        if isinstance(power, Value):
+            p = power.data
+        else:
+            p = power
+        child = Value(self.data ** p, (self, ), op='**')
+        def back():
+            self.grad += (p * (self.data)**(p-1)) * child.grad
+        child._back = back
+        return child
+
+    def __truediv__(self, other):
+        return self * (other**-1)
+
+    def relu(self):
+        child = Value(max(0, self.data), parents=(self, ), op='relu', label='relu')
+        def back():
+            self.grad += (child.data > 0) * child.grad
+        child._back = back
+        print(f'relu: {child}')
         return child
 
     def tanh(self):
         n = self.data
         val = (math.exp(2*n) - 1)/(math.exp(2*n) + 1)
-        Value(math.E)
-
-        return Value(data=val, parents=(self, ), op='tanh', label='tanh()')
-
-    def __div__(self, other):
-        child = Value(self.data / other.data, (self, other), op='/')
+        def back():
+            self.grad += 1 - (val**2)
+        child = Value(data=val, parents=(self, ), op='tanh', label='tanh()')
+        child._back = back
         return child
 
-    def backwards(self):
+    def backward(self):
         self.grad = 1
         order = topo_sort(self)
-        print(order)
         for n in order:
-            if len(n.parents) == 0:
-                continue
-            if n.op == 'tanh':
-                list(n.parents)[0].grad = 1 - n.data ** 2
-                continue
-            p1,p2 = list(n.parents)[0], list(n.parents)[1]
-            if n.op == '+':
-                p1.grad += n.grad
-                p2.grad += n.grad
-            elif n.op == '-':
-                p1.grad -= n.grad
-                p2.grad -= n.grad
-            elif n.op == '/': # p1/p2 == p1 * (1/p2). incr p1 by 1 => 1/p2. incr p2 by 1 -> decrease by (p1/p2)
-                p1.grad += (1/p2.data) * n.grad
-                p2.grad += (-p1.data/(p2.data ** 2)) * n.grad
-            elif n.op == '*':
-                p1.grad += p2.data * n.grad
-                p2.grad += p1.data * n.grad
-            elif n.op == '**':
-                p1.grad += (p2.data * (p1.data ** (p2.data - 1))) * n.grad
-                p2.grad += n.data * math.log(p1.data) * n.grad
-
-            else:
-                raise RuntimeError('unknown operand', n.op)
-
-            print('backwards', n, p1, p2)
+            n._back()
         
 def topo_sort(root):
     def inner(node, stk, seen):
@@ -82,7 +94,4 @@ def topo_sort(root):
     seen = set()
     inner(root, order, seen)
     return order[::-1]
-
-
-
 
