@@ -15,6 +15,9 @@ class Value:
     def __neg__(self):
         return -1 * self
 
+    def __rsub__(self, other):
+        return other + -self
+
     def __add__(self, other):
         other = other if isinstance(other, Value) else Value(other)
         child = Value(self.data + other.data, (self, other), op='+')
@@ -71,7 +74,7 @@ class Value:
         n = self.data
         val = (math.exp(2*n) - 1)/(math.exp(2*n) + 1)
         def back():
-            self.grad += 1 - (val**2)
+            self.grad += (1 - val**2) * child.grad
         child = Value(data=val, parents=(self, ), op='tanh', label='tanh()')
         child._back = back
         return child
